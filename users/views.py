@@ -54,4 +54,3 @@ class UserUploadListView(generics.ListAPIView):
 
     def get_queryset(self):
         return UserUpload.objects.filter(user=self.request.user)
-
