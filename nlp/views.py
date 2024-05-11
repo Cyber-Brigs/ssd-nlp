@@ -1,11 +1,12 @@
 from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import TextProcessing, LdaTopicModelling
-from .serializers import TextProcessingSerializer, LdaTopicModellingSerializer
+from .models import TextProcessing, LdaTopicModelling, LsaTopicModelling
+from .serializers import TextProcessingSerializer, LdaTopicModellingSerializer, LsaTopicModellingSerializer
 from .srs_text_processor import process_pdf
 from users.models import UserUpload
 from .lda_srs_modelling import train_lda_models, save_selected_lda_model
+from .lsa_srs_modelling import train_lsa_models, save_selected_lsa_model
 
 def truncate_path(full_path):
     """
@@ -137,3 +138,51 @@ class LdaTopicModellingListView(generics.ListAPIView):
 
     def get_queryset(self):
         return LdaTopicModelling.objects.filter(user=self.request.user)
+
+class LsaTopics(APIView):    
+    def post(self, request, format=None):
+        text_processing_id = request.data.get('text_processing_id')
+        try:
+            text_processing = TextProcessing.objects.get(pk=text_processing_id)
+        except TextProcessing.DoesNotExist:
+            return Response({'error': 'Preprocessed text was not found for this entry'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:            
+            (plotPayload) = train_lsa_models(text_processing)
+        except Exception as e:
+            return Response({'error': f'Error training model: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Create a new LdaTopicModel instance
+        lsa_model_instance = LsaTopicModelling.objects.create(
+            user=request.user,
+            user_upload=UserUpload.objects.get(pk=text_processing.user_upload_id),
+            text_processing=text_processing
+        )
+        return Response({'lda_model_instance': lsa_model_instance.id,'topic_coherence_results': transform_data_format(plotPayload)}, status=status.HTTP_200_OK)
+
+class LsaTopicsSave(APIView):
+    def patch(self, request, pk, format=None):
+        try:
+            lsa_topic_model_instance = LsaTopicModelling.objects.get(pk=pk)
+        except LsaTopicModelling.DoesNotExist:
+            return Response({'error': 'Topic Model instance was not found'}, status=status.HTTP_404_NOT_FOUND)
+        selected_topics = request.data.get('selected_topics')
+        lsa_topic_model_instance.selected_topics = selected_topics
+        lsa_topic_model_instance.save()
+        try:
+            user_upload = UserUpload.objects.get(pk=lsa_topic_model_instance.user_upload_id)
+            (lsa_path, coherence) = save_selected_lsa_model(lsa_topic_model_instance, clean_filename(user_upload.document.name))
+            lsa_topic_model_instance.lsa_topics_file_path = lsa_path
+            lsa_topic_model_instance.coherence_value = coherence
+            lsa_topic_model_instance.save()
+        except Exception as e:
+            return Response({'error': f'Error updating and saving lda coherent model: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({'topics': lsa_topic_model_instance.selected_topics, 'name': clean_filename(user_upload.document.name), 'dir': lsa_path, 'coherence': coherence})
+    
+class LsaTopicModellingListView(generics.ListAPIView):
+    queryset = LsaTopicModelling.objects.all()
+    serializer_class = LsaTopicModellingSerializer
+
+    def get_queryset(self):
+        return LsaTopicModelling.objects.filter(user=self.request.user)
