@@ -27,3 +27,13 @@ class LdaTopicModelling(models.Model):
     selected_topics = models.PositiveIntegerField(blank=True, null=True)
     coherence_value = models.FloatField(blank=True, null=True, max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+
+class LsaTopicModelling(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user_upload = models.ForeignKey(UserUpload, on_delete=models.CASCADE)
+    text_processing = models.ForeignKey(TextProcessing, on_delete=models.CASCADE)
+    lsa_topics_file_path = models.FileField(upload_to='topic_models/lsa/')
+    selected_topics = models.PositiveIntegerField(blank=True, null=True)
+    coherence_value = models.FloatField(blank=True, null=True, max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
