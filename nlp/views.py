@@ -1,12 +1,14 @@
 from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
 from .models import TextProcessing, LdaTopicModelling, LsaTopicModelling
 from .serializers import TextProcessingSerializer, LdaTopicModellingSerializer, LsaTopicModellingSerializer
 from .srs_text_processor import process_pdf
 from users.models import UserUpload
 from .lda_srs_modelling import train_lda_models, save_selected_lda_model
 from .lsa_srs_modelling import train_lsa_models, save_selected_lsa_model
+from .lda_cosine import generate_lda_capec_results
 
 def truncate_path(full_path):
     """
@@ -19,6 +21,9 @@ def truncate_path(full_path):
         Implement a better filter to hadle relative paths
     """
     return full_path.split("/home/steve/NRF/", 1)[1] if "NRF/" in full_path else full_path
+
+def truncate_model_paths(path):
+    return path.split("/home/steve/NRF/media/", 1)[1] if "media/" in path else path
 
 def clean_filename(filename):
     """
@@ -35,6 +40,7 @@ def clean_filename(filename):
     # Remove extension (if present)
     cleaned_filename = cleaned_filename.split(".")[0]
     return cleaned_filename.split("uploads/", 1)[1] if "uploads/" in cleaned_filename else cleaned_filename
+
 def transform_data_format(data):
     transformed_data = []
 
@@ -186,3 +192,37 @@ class LsaTopicModellingListView(generics.ListAPIView):
 
     def get_queryset(self):
         return LsaTopicModelling.objects.filter(user=self.request.user)
+    
+class LdaCosineCapecResults(APIView):
+    def get(self, pk, text_processing_id, format=None):
+        try:
+            lda_topic_model_instance = LdaTopicModelling.objects.get(pk=pk)
+        except LdaTopicModelling.DoesNotExist:
+            return Response({'error': 'Topic Model instance was not found'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            text_processing_instance = get_object_or_404(TextProcessing, pk=text_processing_id) 
+            user_upload = UserUpload.objects.get(pk=lda_topic_model_instance.user_upload_id)
+            file_name  = clean_filename(user_upload.document.name) 
+            lda_file_path = truncate_model_paths(lda_topic_model_instance.lda_topics_file_path.path)
+            (lda_top_results) = generate_lda_capec_results(text_processing_instance, file_name, lda_file_path)
+        except Exception as e:
+            return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(lda_top_results)
+        return Response({'message': 'success'})
+
+class LsaCosineCapecResults(APIView):
+    def get(self, pk, text_processing_id, format=None):
+        try:
+            lsa_topic_model_instance = LsaTopicModelling.objects.get(pk=pk)
+        except LsaTopicModelling.DoesNotExist:
+            return Response({'error': 'Topic Model instance was not found'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            text_processing_instance = get_object_or_404(TextProcessing, pk=text_processing_id) 
+            user_upload = UserUpload.objects.get(pk=lsa_topic_model_instance.user_upload_id)
+            file_name  = clean_filename(user_upload.document.name) 
+            lsa_file_path = truncate_model_paths(lsa_topic_model_instance.lsa_topics_file_path.path)
+            (lsa_top_results) = generate_lda_capec_results(text_processing_instance, file_name, lsa_file_path)
+        except Exception as e:
+            return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(lsa_top_results)
+        return Response({'message': 'success'})
