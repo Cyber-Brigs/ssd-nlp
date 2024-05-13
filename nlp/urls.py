@@ -10,6 +10,6 @@ urlpatterns = [
     path('lsa-model-topics/', LsaTopics.as_view(), name='lsa-topics'),
     path('lsa-select-topics/<uuid:pk>/', LsaTopicsSave.as_view(), name='lsa-selected-topics'),
     path('lsa-models-view/', LsaTopicModellingListView.as_view(), name='lsa-view-models'),
-    path('lda-results/<uuid:pk>/<uuid:text_processing_id>/', LdaCosineCapecResults.as_view(), name='lda-results'),
-    path('lsa-results/<uuid:pk>/<uuid:text_processing_id>/', LsaCosineCapecResults.as_view(), name='lsa-results')
+    path('lda-results/', LdaCosineCapecResults.as_view(), name='lda-results'),
+    path('lsa-results/', LsaCosineCapecResults.as_view(), name='lsa-results')
 ]
