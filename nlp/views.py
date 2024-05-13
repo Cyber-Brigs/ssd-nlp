@@ -9,6 +9,7 @@ from users.models import UserUpload
 from .lda_srs_modelling import train_lda_models, save_selected_lda_model
 from .lsa_srs_modelling import train_lsa_models, save_selected_lsa_model
 from .lda_cosine import generate_lda_capec_results
+from .lsa_cosine import generate_lsa_capec_results
 
 def truncate_path(full_path):
     """
@@ -194,7 +195,12 @@ class LsaTopicModellingListView(generics.ListAPIView):
         return LsaTopicModelling.objects.filter(user=self.request.user)
     
 class LdaCosineCapecResults(APIView):
-    def get(self, pk, text_processing_id, format=None):
+    def get(self, request, format=None):
+        pk = request.query_params.get('pk', None)
+        text_processing_id = request.query_params.get('text_processing_id', None)
+        if not pk or not text_processing_id:
+            return Response({'error': 'lda_model_id and text_processing_id query parameters are required'}, 
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
             lda_topic_model_instance = LdaTopicModelling.objects.get(pk=pk)
         except LdaTopicModelling.DoesNotExist:
@@ -211,7 +217,12 @@ class LdaCosineCapecResults(APIView):
         return Response({'message': 'success'})
 
 class LsaCosineCapecResults(APIView):
-    def get(self, pk, text_processing_id, format=None):
+    def get(self, request, format=None):
+        pk = request.query_params.get('pk', None)
+        text_processing_id = request.query_params.get('text_processing_id', None)
+        if not pk or not text_processing_id:
+            return Response({'error': 'lsa_model_id and text_processing_id query parameters are required'}, 
+                            status=status.HTTP_400_BAD_REQUEST)
         try:
             lsa_topic_model_instance = LsaTopicModelling.objects.get(pk=pk)
         except LsaTopicModelling.DoesNotExist:
@@ -221,7 +232,7 @@ class LsaCosineCapecResults(APIView):
             user_upload = UserUpload.objects.get(pk=lsa_topic_model_instance.user_upload_id)
             file_name  = clean_filename(user_upload.document.name) 
             lsa_file_path = truncate_model_paths(lsa_topic_model_instance.lsa_topics_file_path.path)
-            (lsa_top_results) = generate_lda_capec_results(text_processing_instance, file_name, lsa_file_path)
+            (lsa_top_results) = generate_lsa_capec_results(text_processing_instance, file_name, lsa_file_path)
         except Exception as e:
             return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         print(lsa_top_results)
