@@ -5,8 +5,13 @@ from django.contrib.auth import get_user_model
 
 class CustomUser(AbstractUser):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
+    first_name = models.CharField(max_length=30, blank=False)
+    last_name = models.CharField(max_length=30, blank=False)
+    email = models.EmailField(unique=True, blank=False)
+    username = models.CharField(unique=True, blank=False)
     # Add custom fields if needed
-    pass
+    def __str__(self):
+        return self.email
 
 User = get_user_model()
 
