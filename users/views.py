@@ -6,6 +6,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from .serializers import UserSerializer, UserUploadSerializer
 from .models import UserUpload
 
@@ -36,7 +37,34 @@ class UserLogin(generics.GenericAPIView):
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         })
+
+class UserAccountView(generics.GenericAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, format=None):
+        user_id = request.query_params.get('ref', None)
         
+        if not user_id:
+            return Response({'error': 'User Identifier not supplied'}, 
+                            status=status.HTTP_400_BAD_REQUEST)
+        
+        # Extract user_id from the token
+        token_user_id = request.user.id
+        
+        if str(token_user_id) != user_id:
+            return Response({'error': 'Access denied. User ID mismatch.'}, 
+                            status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            user = CustomUser.objects.get(pk=user_id)
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'No user with identifier'}, 
+                            status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+     
 class UserUploadView(generics.CreateAPIView):
     queryset = UserUpload.objects.all()
     serializer_class = UserUploadSerializer
