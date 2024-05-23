@@ -10,19 +10,22 @@ class TextProcessingSerializer(serializers.ModelSerializer):
     corpus_file = serializers.SerializerMethodField()
     dictionary_file = serializers.SerializerMethodField()
     time_created = serializers.DateTimeField(source='created_at')
-
+    document_name = serializers.SerializerMethodField()
+    # status = serializers.CharField()
+    def get_document_name(self, instance):
+        return instance.user_upload.document_name
     def get_processed_text_file(self, instance):
-        return instance.processed_text_path.name if instance.processed_text_path else None
+        return bool(instance.processed_text_path.name and instance.processed_text_path)
 
     def get_corpus_file(self, instance):
-        return instance.corpus_path.name if instance.corpus_path else None
+        return bool(instance.corpus_path.name and instance.corpus_path)
 
     def get_dictionary_file(self, instance):
-        return instance.dictionary_path.name if instance.dictionary_path else None
+        return bool(instance.dictionary_path.name and instance.dictionary_path)
 
     class Meta:
         model = TextProcessing
-        fields = ('id', 'user_id', 'user_upload_id','start_page', 'end_page', 'processed_text_file', 'corpus_file', 'dictionary_file', 'time_created')
+        fields = ('id', 'user_id', 'user_upload_id', 'document_name', 'start_page', 'end_page', 'processed_text_file', 'corpus_file','status', 'dictionary_file', 'time_created')
 
 class LdaTopicModellingSerializer(serializers.ModelSerializer):
     user_id = serializers.ReadOnlyField(source='user.id')

@@ -14,9 +14,15 @@ class TextProcessing(models.Model):
     corpus_path = models.FileField(upload_to='processed_files/corpora/')
     dictionary_path = models.FileField(upload_to='processed_files/dictionaries/')
     created_at = models.DateTimeField(auto_now_add=True)
-
+    STATUS_CHOICES = [
+        ('ready', 'Ready'),
+        ('pending', 'Pending'),
+    ]
+    status = models.CharField(max_length=8, choices=STATUS_CHOICES, default='ready')
     def __str__(self):
         return f'TextProcessing ID: {self.id}'
+    def get_document_details(self):
+        return f'Document: {self.user_upload.document_name}, Pages: {self.start_page}-{self.end_page}'
         
 class LdaTopicModelling(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
