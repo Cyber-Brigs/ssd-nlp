@@ -25,7 +25,7 @@ def train_lsa_models(processing_instance):
     corpus = corpora.MmCorpus(corpus_path)
     id2word = corpora.Dictionary.load(dictionary_path)
     start = 1
-    limit = 5
+    limit = 30
     step = 1
     with open(processed_texts_path, 'rb') as processed_text_file:
         processed_text = pickle.load(processed_text_file)

@@ -23,7 +23,7 @@ def train_lda_models(processing_instance):
     dictionary_path = truncate_path(processing_instance.dictionary_path.path)
     processed_texts_path = truncate_path(processing_instance.processed_text_path.path)
     start=1
-    limit=5
+    limit=30
     step=1
     corpus = corpora.MmCorpus(corpus_path)
     id2word = corpora.Dictionary.load(dictionary_path)
