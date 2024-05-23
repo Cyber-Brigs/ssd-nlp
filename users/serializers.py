@@ -14,4 +14,5 @@ class UserSerializer(serializers.ModelSerializer):
 class UserUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserUpload
-        fields = ['id', 'user_id', 'document', 'uploaded_at', 'document_name']
+        fields = ['id', 'user_id', 'document', 'uploaded_at', 'document_name', 'status']
+        read_only_fields = ['document_name']

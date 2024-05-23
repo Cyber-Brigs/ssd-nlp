@@ -19,7 +19,12 @@ class UserUpload(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, default=None)
     document = models.FileField(upload_to='uploads/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    document_name = models.CharField(max_length=255)
+    document_name = models.CharField(max_length=255, unique=True)
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
+    STATUS_CHOICES = [
+        ('available', 'Available'),
+        ('unavailable', 'Unavailable'),
+    ]
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='available')
     def __str__(self):
         return self.document_name

@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.exceptions import ValidationError
 from .serializers import UserSerializer, UserUploadSerializer
 from .models import UserUpload
 
@@ -72,8 +73,16 @@ class UserUploadView(generics.CreateAPIView):
     parser_classes = [MultiPartParser, FormParser]
     
     def perform_create(self, serializer):
-        # Set current user and other metadata
-        serializer.save(user=self.request.user)
+        # Extract the document name from the uploaded file metadata
+        document = self.request.FILES.get('document')
+        document_name = document.name if document else ''
+        
+        # Check for uniqueness of the document
+        if UserUpload.objects.filter(document_name=document_name).exists():
+            raise ValidationError({"detail": "Please modify document name to avoid duplicity and security."})
+        
+        # Save the user and the document name automatically
+        serializer.save(user=self.request.user, document_name=document_name)
         
 class UserUploadListView(generics.ListAPIView):
     queryset = UserUpload.objects.all()
