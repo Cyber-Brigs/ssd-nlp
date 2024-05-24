@@ -120,5 +120,7 @@ def generate_lda_capec_results(text_processing_instace, file_name, lda_file_path
     print("LDA TOP 10 ATTACK Patterns")
     for x in range(0, 10):
         print(lda_top_results[x])
-    return lda_top_results
+    
+    formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lda_top_results[:10]]
+    return formatted_results
 

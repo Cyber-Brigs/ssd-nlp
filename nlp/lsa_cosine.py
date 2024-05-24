@@ -131,5 +131,5 @@ def generate_lsa_capec_results(text_processing_instace, file_name, lsa_file_path
     print("LSA TOP 10 ATTACK Patterns")
     for x in range(0, 10):
         print(lsa_top_results[x])
-    return lsa_top_results
-
+    formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lsa_top_results[:10]]
+    return formatted_results
