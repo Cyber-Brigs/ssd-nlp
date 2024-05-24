@@ -10,6 +10,7 @@ from .lda_srs_modelling import train_lda_models, save_selected_lda_model
 from .lsa_srs_modelling import train_lsa_models, save_selected_lsa_model
 from .lda_cosine import generate_lda_capec_results
 from .lsa_cosine import generate_lsa_capec_results
+import csv
 
 def truncate_path(full_path):
     """
@@ -56,6 +57,33 @@ def transform_data_format(data):
         })
 
     return transformed_data
+
+def read_csv_file(file_path):
+    """Reads a CSV file and returns a dictionary with ID as the key and the rest of the data as values."""
+    capec_dict = {}
+    with open(file_path, mode='r', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            capec_id = int(row['ID'])
+            capec_dict[capec_id] = row
+    return capec_dict
+
+def serialize_vulnerabilities(vulnerability_list, csv_data):
+    """Transforms a list of vulnerabilities using the CSV data into detailed objects."""
+    detailed_vulnerabilities = []
+    for item in vulnerability_list:
+        capec_id = item['capec_id']
+        coherence = item['coherence']
+        if capec_id in csv_data:
+            detailed_vulnerability = csv_data[capec_id]
+            detailed_vulnerability['coherence'] = coherence  # Add coherence value to the detailed data
+            detailed_vulnerabilities.append(detailed_vulnerability)
+    return detailed_vulnerabilities
+
+# Path to the CSV file
+csv_file_path = 'nlp/CAPEC/Comprehensive CAPEC Dictionary.csv'
+# Read the CSV file
+csv_data = read_csv_file(csv_file_path)
 
 class TextProcess(APIView):
     def post(self, request, format=None):
@@ -213,8 +241,8 @@ class LdaCosineCapecResults(APIView):
             (lda_top_results) = generate_lda_capec_results(text_processing_instance, file_name, lda_file_path)
         except Exception as e:
             return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        print(lda_top_results)
-        return Response({'message': 'success'})
+        detailed_vulnerabilities = serialize_vulnerabilities(lda_top_results, csv_data)
+        return Response({'message': 'success','results': detailed_vulnerabilities})
 
 class LsaCosineCapecResults(APIView):
     def get(self, request, format=None):
@@ -235,5 +263,5 @@ class LsaCosineCapecResults(APIView):
             (lsa_top_results) = generate_lsa_capec_results(text_processing_instance, file_name, lsa_file_path)
         except Exception as e:
             return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        print(lsa_top_results)
-        return Response({'message': 'success'})
+        detailed_vulnerabilities = serialize_vulnerabilities(lsa_top_results, csv_data)
+        return Response({'message': 'success','results': detailed_vulnerabilities})
