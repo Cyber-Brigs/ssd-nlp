@@ -241,6 +241,8 @@ class LdaCosineCapecResults(APIView):
             (lda_top_results) = generate_lda_capec_results(text_processing_instance, file_name, lda_file_path)
         except Exception as e:
             return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        lda_topic_model_instance.results = lda_top_results
+        lda_topic_model_instance.save()
         detailed_vulnerabilities = serialize_vulnerabilities(lda_top_results, csv_data)
         return Response({'message': 'success','results': detailed_vulnerabilities})
 
@@ -263,5 +265,35 @@ class LsaCosineCapecResults(APIView):
             (lsa_top_results) = generate_lsa_capec_results(text_processing_instance, file_name, lsa_file_path)
         except Exception as e:
             return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        lsa_topic_model_instance.results = lsa_top_results
+        lsa_topic_model_instance.save()
         detailed_vulnerabilities = serialize_vulnerabilities(lsa_top_results, csv_data)
+        return Response({'message': 'success','results': detailed_vulnerabilities})
+    
+class LdaViewResults(APIView):
+    def get(self, request, format=None):
+        pk = request.query_params.get('id', None)
+        if not pk:
+            return Response({'error': 'lsa model identifier parameter is required'}, 
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            lda_topic_model_instance = LdaTopicModelling.objects.get(pk=pk)
+        except LsaTopicModelling.DoesNotExist:
+            return Response({'error': 'Topic Model instance was not found'}, status=status.HTTP_404_NOT_FOUND)
+        results_object = lda_topic_model_instance.results
+        detailed_vulnerabilities = serialize_vulnerabilities(results_object, csv_data)
+        return Response({'message': 'success','results': detailed_vulnerabilities})
+
+class LsaViewResults(APIView):
+    def get(self, request, format=None):
+        pk = request.query_params.get('id', None)
+        if not pk:
+            return Response({'error': 'lsa model identifier parameter is required'}, 
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            lsa_topic_model_instance = LsaTopicModelling.objects.get(pk=pk)
+        except LsaTopicModelling.DoesNotExist:
+            return Response({'error': 'Topic Model instance was not found'}, status=status.HTTP_404_NOT_FOUND)
+        results_object = lsa_topic_model_instance.results
+        detailed_vulnerabilities = serialize_vulnerabilities(results_object, csv_data)
         return Response({'message': 'success','results': detailed_vulnerabilities})
