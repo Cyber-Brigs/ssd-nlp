@@ -118,9 +118,12 @@ def generate_lda_capec_results(text_processing_instace, file_name, lda_file_path
     pandas_frame_lda.to_csv(lda_results_file, encoding="utf-8", index=False)
 
     print("LDA TOP 10 ATTACK Patterns")
-    for x in range(0, 10):
-        print(lda_top_results[x])
+    # for x in range(0, 10):
+    #     print(lda_top_results[x])
     
-    formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lda_top_results[:10]]
+    # formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lda_top_results[:10]]
+    # print(formatted_results)
+    formatted_results = [{'capec_id': int(item[0]), 'coherence': float(item[1])} for item in lda_top_results[:10]]
+
     return formatted_results
 

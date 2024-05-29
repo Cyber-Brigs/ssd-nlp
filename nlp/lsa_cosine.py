@@ -128,8 +128,10 @@ def generate_lsa_capec_results(text_processing_instace, file_name, lsa_file_path
     lsa_results_file = output_file_path  + file_name + '_lsa.csv'
     pandas_frame_lsa.to_csv(lsa_results_file, encoding="utf-8", index=False)
 
-    print("LSA TOP 10 ATTACK Patterns")
-    for x in range(0, 10):
-        print(lsa_top_results[x])
-    formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lsa_top_results[:10]]
+    # print("LSA TOP 10 ATTACK Patterns")
+    # for x in range(0, 10):
+    #     print(lsa_top_results[x])
+    # formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lsa_top_results[:10]]
+    formatted_results = [{'capec_id': int(item[0]), 'coherence': float(item[1])} for item in lsa_top_results[:10]]
+
     return formatted_results
