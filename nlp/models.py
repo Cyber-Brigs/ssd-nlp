@@ -33,6 +33,7 @@ class LdaTopicModelling(models.Model):
     selected_topics = models.PositiveIntegerField(blank=True, null=True)
     coherence_value = models.FloatField(blank=True, null=True, max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+    results = models.JSONField(default=list, blank=True, null=True)
 
 class LsaTopicModelling(models.Model):
     id = models.UUIDField(default=uuid.uuid4, primary_key=True, editable=False)
@@ -43,3 +44,4 @@ class LsaTopicModelling(models.Model):
     selected_topics = models.PositiveIntegerField(blank=True, null=True)
     coherence_value = models.FloatField(blank=True, null=True, max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+    results = models.JSONField(default=list, blank=True, null=True)
