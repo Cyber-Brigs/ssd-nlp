@@ -10,9 +10,9 @@ class TextProcessing(models.Model):
     user_upload = models.ForeignKey(UserUpload, on_delete=models.CASCADE)
     start_page = models.PositiveIntegerField()
     end_page = models.PositiveIntegerField()
-    processed_text_path = models.FileField(upload_to='processed_files/texts/')
-    corpus_path = models.FileField(upload_to='processed_files/corpora/')
-    dictionary_path = models.FileField(upload_to='processed_files/dictionaries/')
+    processed_text_path = models.FileField(upload_to='processed_files/texts/', max_length=255)
+    corpus_path = models.FileField(upload_to='processed_files/corpora/', max_length=255)
+    dictionary_path = models.FileField(upload_to='processed_files/dictionaries/', max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     STATUS_CHOICES = [
         ('ready', 'Ready'),

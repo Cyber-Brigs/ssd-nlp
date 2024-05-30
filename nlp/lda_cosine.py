@@ -1,19 +1,58 @@
+import os
 import copy
 import gensim
 import pandas as pd
 import gensim.corpora as corpora
+import requests
+import tempfile
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
-def truncate_path(full_path):
+def download_file(url, local_filename):
     """
-    Truncates a full path to start from 'media/'.
+    Download a file from a URL and save it locally.
+    """
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(local_filename, 'wb') as f:
+            f.write(response.content)
+    else:
+        raise RuntimeError(f"Failed to download file: {url}")
+
+def load_lda_model_from_url(base_url):
+    """
+    Download LDA model files from a given base URL and load the model using gensim.
     Args:
-        full_path: The full path to truncate.
+        base_url (str): The base URL where the model files are stored.
     Returns:
-        The truncated path starting from 'media/uploads/'.
-    Todo:
-        Implement a better filter to hadle relative paths
+        gensim.models.LdaModel: The loaded LDA model.
     """
-    return full_path.split("/home/steve/NRF/media/", 1)[1] if "NRF/" in full_path else full_path
+    # Extract the model name from the base URL
+    model_name = os.path.basename(base_url)
+    # Create a temporary directory to store downloaded files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Define URLs for each file
+        model_url = f"{base_url}"
+        expelogbeta_url = f"{base_url}.expElogbeta.npy"
+        id2word_url = f"{base_url}.id2word"
+        state_url = f"{base_url}.state"
+        
+        # Define local file paths
+        model_path = os.path.join(temp_dir, model_name)
+        expelogbeta_path = os.path.join(temp_dir, f"{model_name}.expElogbeta.npy")
+        id2word_path = os.path.join(temp_dir, f"{model_name}.id2word")
+        state_path = os.path.join(temp_dir, f"{model_name}.state")
+        
+        # Download each file
+        download_file(model_url, model_path)
+        download_file(expelogbeta_url, expelogbeta_path)
+        download_file(id2word_url, id2word_path)
+        download_file(state_url, state_path)
+        
+        # Load the LDA model from the temporary directory
+        lda_model = gensim.models.LdaModel.load(model_path)
+    
+    return lda_model
 
 def calculate_cosine_similarity_lda(lda_srs_num_topics, lda_vector, capec_vector_list_lda, lda_cosine_result_list):
     lda_result_local = {}
@@ -48,7 +87,7 @@ def get_CAPEC_IDs(capec_list):
         list_with_topics_and_capec_ids.append(copy.deepcopy(topic_list))
     return list_with_topics_and_capec_ids
 
-def generate_lda_capec_results(text_processing_instace, file_name, lda_file_path):
+def generate_lda_capec_results(file_name, lda_file_url):
     """
     Runs lda analysis and maps vulnerabilities in document to CAPEC Lib.
     Args:
@@ -57,18 +96,10 @@ def generate_lda_capec_results(text_processing_instace, file_name, lda_file_path
         lda_file_path: Path to the directory with specific lda_file.
     Returns:
         LDA matching attack patterns.
-    """
-    corpus_path = truncate_path(text_processing_instace.corpus_path.path)
-    dictionary_path = truncate_path(text_processing_instace.dictionary_path.path)
-    
-    models_corpus = corpora.MmCorpus(corpus_path)
-    models_dictionary = corpora.Dictionary.load(dictionary_path)
-    csv_filename = file_name + '.csv'
-    capec_vector_list = []
+    """    
     lda_vector = []
-    similarity_results = {}
-    capec_num = 1
-    srs_lda = gensim.models.LdaModel.load(lda_file_path)
+    srs_lda = load_lda_model_from_url(f'{lda_file_url}')
+    print(srs_lda)
     lda_srs_num_topics = len(srs_lda.get_topics())
     
     # i. Load in the LDA model from the SRS document into lda_vector
@@ -113,16 +144,21 @@ def generate_lda_capec_results(text_processing_instace, file_name, lda_file_path
         pandas_frame_lda.rename(columns={x: "Topic-" + str(x + 1)}, inplace=True)
 
     # Save the results to a csv file.
-    output_file_path = 'media/similarity_results/lda/'
+    output_file_path = 'similarity_results/lda/'
     lda_results_file = output_file_path  + file_name+ '_lda.csv'
-    pandas_frame_lda.to_csv(lda_results_file, encoding="utf-8", index=False)
 
-    print("LDA TOP 10 ATTACK Patterns")
-    # for x in range(0, 10):
-    #     print(lda_top_results[x])
+    # Save the DataFrame to a temporary CSV file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_csv_file:
+        pandas_frame_lda.to_csv(temp_csv_file.name, encoding="utf-8", index=False)
+        temp_csv_path = temp_csv_file.name
+    # Read the CSV file content and save it to Azure Blob Storage
+    with open(temp_csv_path, 'rb') as csv_file:
+        csv_content = ContentFile(csv_file.read())
+        default_storage.save(lda_results_file, csv_content)
+
+    # Clean up the temporary file
+    os.remove(temp_csv_path)
     
-    # formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lda_top_results[:10]]
-    # print(formatted_results)
     formatted_results = [{'capec_id': int(item[0]), 'coherence': float(item[1])} for item in lda_top_results[:10]]
 
     return formatted_results

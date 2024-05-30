@@ -1,7 +1,58 @@
+import os
 import copy
 import gensim
 import pandas as pd
 import gensim.corpora as corpora
+import requests
+import tempfile
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+
+def download_file(url, local_filename):
+    """
+    Download a file from a URL and save it locally.
+    """
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(local_filename, 'wb') as f:
+            f.write(response.content)
+    else:
+        raise RuntimeError(f"Failed to download file: {url}")
+
+def load_lsa_model_from_url(base_url):
+    """
+    Download LSA model files from a given base URL and load the model using gensim.
+    Args:
+        base_url (str): The base URL where the model files are stored.
+    Returns:
+        gensim.models.LsiModel: The loaded LSA model.
+    """
+    # Extract the model name from the base URL
+    model_name = os.path.basename(base_url)
+    # Create a temporary directory to store downloaded files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Define URLs for each file
+        model_url = f"{base_url}"
+        projection_url = f"{base_url}.projection"
+        
+        # Define local file paths
+        model_path = os.path.join(temp_dir, model_name)
+        projection_path = os.path.join(temp_dir, f"{model_name}.projection")
+        
+        # Download each file
+        download_file(model_url, model_path)
+        download_file(projection_url, projection_path)
+        
+        # Load the LDA model from the temporary directory
+        lsa_model = gensim.models.LsiModel.load(model_path)
+    
+    return lsa_model
+
+# Function to download file from Azure Blob Storage
+def download_file_from_url(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    return ContentFile(response.content)
 
 def truncate_path(full_path):
     """
@@ -69,17 +120,15 @@ def generate_lsa_capec_results(text_processing_instace, file_name, lsa_file_path
     Returns:
         LSA matching attack patterns.
     """
-    corpus_path = truncate_path(text_processing_instace.corpus_path.path)
-    dictionary_path = truncate_path(text_processing_instace.dictionary_path.path)
-    
-    models_corpus = corpora.MmCorpus(corpus_path)
-    models_dictionary = corpora.Dictionary.load(dictionary_path)
-    
-    capec_vector_list = []
+    dictionary_url = text_processing_instace.dictionary_path
+    dictionary_file = download_file_from_url(dictionary_url)
+
+    with tempfile.NamedTemporaryFile(delete=False) as temp_dict_file:
+        temp_dict_file.write(dictionary_file.read())
+        temp_dict_path = temp_dict_file.name
+    models_dictionary = corpora.Dictionary.load(temp_dict_path)
     lsa_vector = []
-    similarity_results = {}
-    capec_num = 1
-    srs_lsa = gensim.models.LsiModel.load(lsa_file_path)
+    srs_lsa = load_lsa_model_from_url(f'{lsa_file_path}')
     lsa_srs_num_topics = len(srs_lsa.get_topics())
     
     # i. Load in the LSA model from the SRS document into lsa_vector
@@ -124,14 +173,20 @@ def generate_lsa_capec_results(text_processing_instace, file_name, lsa_file_path
         pandas_frame_lsa.rename(columns={x: "Topic-" + str(x + 1)}, inplace=True)
 
     # Save the results to a csv file.
-    output_file_path = 'media/similarity_results/lsa/'
+    output_file_path = 'similarity_results/lsa/'
     lsa_results_file = output_file_path  + file_name + '_lsa.csv'
-    pandas_frame_lsa.to_csv(lsa_results_file, encoding="utf-8", index=False)
+    # Save the DataFrame to a temporary CSV file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_csv_file:
+        pandas_frame_lsa.to_csv(temp_csv_file.name, encoding="utf-8", index=False)
+        temp_csv_path = temp_csv_file.name
+    # Read the CSV file content and save it to Azure Blob Storage
+    with open(temp_csv_path, 'rb') as csv_file:
+        csv_content = ContentFile(csv_file.read())
+        default_storage.save(lsa_results_file, csv_content)
 
-    # print("LSA TOP 10 ATTACK Patterns")
-    # for x in range(0, 10):
-    #     print(lsa_top_results[x])
-    # formatted_results = [{'capec_id': item[0], 'coherence': item[1]} for item in lsa_top_results[:10]]
+    # Clean up the temporary file
+    os.remove(temp_csv_path)
+    
     formatted_results = [{'capec_id': int(item[0]), 'coherence': float(item[1])} for item in lsa_top_results[:10]]
 
     return formatted_results

@@ -1,39 +1,78 @@
+import os
 from gensim import corpora
 from gensim.models import LdaModel, CoherenceModel
 import pickle
+import tempfile
+import requests
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.conf import settings
 
-def truncate_path(full_path):
+def upload_files_to_azure(local_dir, base_azure_path):
     """
-    Truncates a full path to start from 'media/uploads/'.
+    Uploads all files from a local directory to Azure Blob Storage under the specified base path.
+    
     Args:
-        full_path: The full path to truncate.
+        local_dir (str): The local directory containing the files to upload.
+        base_azure_path (str): The base path in Azure Blob Storage where the files will be uploaded.
+    
     Returns:
-        The truncated path starting from 'media/uploads/'.
-    Todo:
-        Implement a better filter to hadle relative paths
+        list: A list of URLs to the uploaded files.
     """
-    return full_path.split("/home/steve/NRF/media/", 1)[1] if "NRF/" in full_path else full_path
+    uploaded_files = []
+    for file_name in os.listdir(local_dir):
+        file_path = os.path.join(local_dir, file_name)
+        with open(file_path, 'rb') as file_data:
+            azure_path = f"{base_azure_path}/{file_name}"
+            default_storage.save(azure_path, ContentFile(file_data.read()))
+            uploaded_files.append(f"{settings.MEDIA_URL}{azure_path}")
+    return uploaded_files
+
+# Function to download file from Azure Blob Storage
+def download_file_from_url(url):
+    response = requests.get(url)
+    response.raise_for_status()
+    return ContentFile(response.content)
 
 
 lda_model_list = []
 coherence_values = []
 # Define a function to train LDA models and return coherence values
 def train_lda_models(processing_instance):    
-    corpus_path = truncate_path(processing_instance.corpus_path.path)
-    dictionary_path = truncate_path(processing_instance.dictionary_path.path)
-    processed_texts_path = truncate_path(processing_instance.processed_text_path.path)
-    start=1
-    limit=30
-    step=1
-    corpus = corpora.MmCorpus(corpus_path)
-    id2word = corpora.Dictionary.load(dictionary_path)
+    corpus_url = processing_instance.corpus_path
+    dictionary_url = processing_instance.dictionary_path
+    processed_texts_url = processing_instance.processed_text_path
 
-    with open(processed_texts_path, 'rb') as processed_text_file:
+    # Download files from Azure Blob Storage
+    corpus_file = download_file_from_url(corpus_url)
+    dictionary_file = download_file_from_url(dictionary_url)
+    processed_text_file = download_file_from_url(processed_texts_url)
+    # Load corpus and dictionary
+    with tempfile.NamedTemporaryFile(delete=False) as temp_corpus_file:
+        temp_corpus_file.write(corpus_file.read())
+        temp_corpus_path = temp_corpus_file.name
+    corpus = corpora.MmCorpus(temp_corpus_path)
+
+    with tempfile.NamedTemporaryFile(delete=False) as temp_dict_file:
+        temp_dict_file.write(dictionary_file.read())
+        temp_dict_path = temp_dict_file.name
+    id2word = corpora.Dictionary.load(temp_dict_path)
+
+    # Load processed texts
+    with tempfile.NamedTemporaryFile(delete=False) as temp_texts_file:
+        temp_texts_file.write(processed_text_file.read())
+        temp_texts_path = temp_texts_file.name
+    with open(temp_texts_path, 'rb') as processed_text_file:
         processed_text = pickle.load(processed_text_file)
+    
+    start=1
+    limit=5
+    step=1
+
     # Create LDA models with varying number of topics
     for num_topics in range(start, limit + 1, step):
         lda_model = LdaModel(corpus=corpus, id2word=id2word, num_topics=num_topics, random_state=100,
-                              update_every=1, chunksize=100, passes=10, alpha='auto', per_word_topics=True)
+                             update_every=1, chunksize=100, passes=10, alpha='auto', per_word_topics=True)
         coherence_model_lda = CoherenceModel(model=lda_model, texts=processed_text, dictionary=id2word, coherence='c_v')
         lda_model_list.append(lda_model)
         coherence_values.append(coherence_model_lda.get_coherence())
@@ -47,10 +86,18 @@ def train_lda_models(processing_instance):
 
 # Define a function to save the selected LDA model
 def save_selected_lda_model(model_instance, file_name):
-    output_file_path = 'media/topic_models/lda/'
-    lda_topic_file = output_file_path + file_name + "_lda"  
-    print(lda_model_list) 
+    output_file_path = 'topic_models/lda/'
+    lda_topic_file_name = file_name + "_lda"
+    
     selected_lda_model = lda_model_list[model_instance.selected_topics - 1]
-    selected_lda_model.save(lda_topic_file)
+    
+    # Save the model to a temporary directory
+    with tempfile.TemporaryDirectory() as temp_lda_dir:
+        temp_lda_path = os.path.join(temp_lda_dir, lda_topic_file_name)
+        selected_lda_model.save(temp_lda_path)
+        
+        # Upload all model files to Azure Blob Storage
+        uploaded_files = upload_files_to_azure(temp_lda_dir, output_file_path)
+    
+    return f'{settings.MEDIA_URL}{output_file_path}{lda_topic_file_name}', coherence_values[model_instance.selected_topics - 1]
 
-    return lda_topic_file, coherence_values[model_instance.selected_topics - 1]

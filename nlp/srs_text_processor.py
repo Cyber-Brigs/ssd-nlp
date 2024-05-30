@@ -9,6 +9,10 @@ import gensim
 from gensim import corpora
 from gensim.utils import simple_preprocess
 from nltk.corpus import stopwords
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.conf import settings
+import tempfile
 
 # Initialize SpaCy and Gensim
 stopWords = stopwords.words('english')
@@ -16,9 +20,9 @@ stopWords.extend(["from", "subject", "re", "edu", "use"])
 nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
 
 # FILE PATHS
-CORPUS_FILE_PATH = 'media/processed_files/corpora/'
-DICTIONARY_FILE_PATH = 'media/processed_files/dictionaries/'
-PROCESSED_TEXT_FILE_PATH = 'media/processed_files/texts/'
+CORPUS_FILE_PATH = 'processed_files/corpora/'
+DICTIONARY_FILE_PATH = 'dictionaries/'
+PROCESSED_TEXT_FILE_PATH = 'processed_files/texts/'
 
 def remove_punctuation(supplied_text):
     translator = str.maketrans('', '', string.punctuation)
@@ -41,10 +45,9 @@ def lemmatization(supplied_text, allowed_pos=["NOUN", "ADJ", "VERB", "ADV"]):
         text_out.append([token.lemma_ for token in doc if token.pos_ in allowed_pos])
     return text_out
 
-def process_pdf(file_path, start_page, end_page, original_filename):
+def process_pdf(file_obj, start_page, end_page, original_filename):
     processed_text = []
-
-    pdf = fitz.open(file_path)
+    pdf = fitz.open(stream=file_obj.read(), filetype="pdf")
     for x in range(start_page, end_page):
         page = pdf.load_page(x)
         text = page.get_text("text")
@@ -80,13 +83,31 @@ def process_pdf(file_path, start_page, end_page, original_filename):
     corpus = [id2word.doc2bow(word) for word in lemma]
     
     # SAVED RESULTS FILE NAMES
-    corpus_file_name = original_filename + "_corpus"
-    dictionary_file_name = original_filename + "_dictionary"
-    texts_file_name = original_filename + "_text"
-    # Save corpus and dictionary to disk
-    corpora.MmCorpus.serialize(CORPUS_FILE_PATH + corpus_file_name, corpus)
-    id2word.save(DICTIONARY_FILE_PATH + dictionary_file_name)
-    file = open(PROCESSED_TEXT_FILE_PATH + texts_file_name, 'wb')
-    # SAVES TEXT AS BYTES IN A FILE TO BE LOADED AGAIN WHEN NEEDED
-    pickle.dump(lemma, file)
-    return CORPUS_FILE_PATH + corpus_file_name, DICTIONARY_FILE_PATH + dictionary_file_name, PROCESSED_TEXT_FILE_PATH + texts_file_name
+    corpus_file_name = original_filename + '_corpus'
+    dictionary_file_name = original_filename + '_dictionary'
+    texts_file_name = original_filename+ '_text'
+    # Serialize corpus to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False) as temp_corpus_file:
+        temp_corpus_path = temp_corpus_file.name
+    corpora.MmCorpus.serialize(temp_corpus_path, corpus)
+    # Save the serialized corpus to Azure Blob Storage
+    with open(temp_corpus_path, 'rb') as corpus_file:
+        corpus_content = ContentFile(corpus_file.read())
+        corpus_path = default_storage.save(f'processed_files/corpora/{corpus_file_name}', corpus_content)
+    
+    # Serialize dictionary to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False) as temp_dict_file:
+        temp_dict_path = temp_dict_file.name
+    id2word.save(temp_dict_path)
+     # Save the serialized dictionary to Azure Blob Storage
+    with open(temp_dict_path, 'rb') as dict_file:
+        dict_content = ContentFile(dict_file.read())
+        dictionary_path = default_storage.save(f'processed_files/dictionaries/{dictionary_file_name}', dict_content)
+    
+    # Serialize the lemma to bytes and save it to Azure Blob Storage
+    texts_bytes = ContentFile(pickle.dumps(lemma))
+    texts_path = default_storage.save(f'processed_files/texts/{texts_file_name}', texts_bytes)
+
+    return (f'{settings.MEDIA_URL}processed_files/corpora/{corpus_file_name}',
+            f'{settings.MEDIA_URL}processed_files/dictionaries/{dictionary_file_name}',
+            f'{settings.MEDIA_URL}processed_files/texts/{texts_file_name}')

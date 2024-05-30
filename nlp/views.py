@@ -2,6 +2,8 @@ from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from .models import TextProcessing, LdaTopicModelling, LsaTopicModelling
 from .serializers import TextProcessingSerializer, LdaTopicModellingSerializer, LsaTopicModellingSerializer
 from .srs_text_processor import process_pdf
@@ -11,21 +13,6 @@ from .lsa_srs_modelling import train_lsa_models, save_selected_lsa_model
 from .lda_cosine import generate_lda_capec_results
 from .lsa_cosine import generate_lsa_capec_results
 import csv
-
-def truncate_path(full_path):
-    """
-    Truncates a full path to start from 'media/uploads/'.
-    Args:
-        full_path: The full path to truncate.
-    Returns:
-        The truncated path starting from 'media/uploads/'.
-    Todo:
-        Implement a better filter to hadle relative paths
-    """
-    return full_path.split("/home/steve/NRF/", 1)[1] if "NRF/" in full_path else full_path
-
-def truncate_model_paths(path):
-    return path.split("/home/steve/NRF/media/", 1)[1] if "media/" in path else path
 
 def clean_filename(filename):
     """
@@ -98,11 +85,13 @@ class TextProcess(APIView):
 
         # Process the PDF file using srs_text_processor
         try:
-            (corpus_path, dictionary_path, processed_text_path) = process_pdf(truncate_path(user_upload.document.path), start_page, end_page, clean_filename(user_upload.document.name))
+            with default_storage.open(user_upload.document.name, 'rb') as file_obj:
+                (corpus_path, dictionary_path, processed_text_path) = process_pdf(file_obj, start_page, end_page, clean_filename(user_upload.document.name))
         except Exception as e:
             return Response({'error': f'Error processing PDF: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Create a new TextProcessing instance
+        
         text_processing = TextProcessing.objects.create(
             user=request.user,
             user_upload=user_upload,
@@ -237,8 +226,8 @@ class LdaCosineCapecResults(APIView):
             text_processing_instance = get_object_or_404(TextProcessing, pk=text_processing_id) 
             user_upload = UserUpload.objects.get(pk=lda_topic_model_instance.user_upload_id)
             file_name  = clean_filename(user_upload.document.name) 
-            lda_file_path = truncate_model_paths(lda_topic_model_instance.lda_topics_file_path.path)
-            (lda_top_results) = generate_lda_capec_results(text_processing_instance, file_name, lda_file_path)
+            lda_file_url = lda_topic_model_instance.lda_topics_file_path
+            (lda_top_results) = generate_lda_capec_results(file_name, lda_file_url)
         except Exception as e:
             return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         lda_topic_model_instance.results = lda_top_results
@@ -261,8 +250,8 @@ class LsaCosineCapecResults(APIView):
             text_processing_instance = get_object_or_404(TextProcessing, pk=text_processing_id) 
             user_upload = UserUpload.objects.get(pk=lsa_topic_model_instance.user_upload_id)
             file_name  = clean_filename(user_upload.document.name) 
-            lsa_file_path = truncate_model_paths(lsa_topic_model_instance.lsa_topics_file_path.path)
-            (lsa_top_results) = generate_lsa_capec_results(text_processing_instance, file_name, lsa_file_path)
+            lsa_file_url= lsa_topic_model_instance.lsa_topics_file_path
+            (lsa_top_results) = generate_lsa_capec_results(text_processing_instance, file_name, lsa_file_url)
         except Exception as e:
             return Response({'error': f'Error obtaining processing files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         lsa_topic_model_instance.results = lsa_top_results
