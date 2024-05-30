@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'storages',
     'users',
     'nlp',
 ]
@@ -99,18 +100,26 @@ DATABASES = {
 # storage
 
 # Media files (pdfs uploaded by users)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# MEDIA_URL = '/media/' dev
+AZURE_CUSTOM_DOMAIN = os.getenv('AZURE_ACCOUNT_NAME') + '.blob.core.windows.net'
+AZURE_CONTAINER = os.getenv('AZURE_CONTAINER')
+AZURE_CONNECTION_STRING = f"DefaultEndpointsProtocol=https;AccountName={os.getenv('AZURE_ACCOUNT_NAME')};AccountKey={os.getenv('AZURE_ACCOUNT_KEY')};EndpointSuffix=core.windows.net"
+# AZURE_CUSTOM_DOMAIN = f"{os.getenv('AZURE_ACCOUNT_NAME')}.blob.core.windows.net"
 
-if DEBUG:
-    # Local development settings
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-else:
-    # Production settings (Azure Blob Storage)
-    DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
-    AZURE_CONNECTION_STRING = f"DefaultEndpointsProtocol=https;AccountName={os.getenv('AZURE_ACCOUNT_NAME')};AccountKey={os.getenv('AZURE_ACCOUNT_KEY')};EndpointSuffix=core.windows.net"
-    AZURE_CUSTOM_DOMAIN = f"{os.getenv('AZURE_ACCOUNT_NAME')}.blob.core.windows.net"
-    AZURE_CONTAINER = os.getenv('AZURE_CONTAINER')
+MEDIA_URL = 'https://' + AZURE_CUSTOM_DOMAIN + '/' + os.getenv('AZURE_CONTAINER') + '/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
+
+# PREVIOUS DEV SETTINGS
+# if DEBUG:
+#     # Local development settings
+#     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+# else:
+#     # Production settings (Azure Blob Storage)
+#     DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
+#     AZURE_CONNECTION_STRING = f"DefaultEndpointsProtocol=https;AccountName={os.getenv('AZURE_ACCOUNT_NAME')};AccountKey={os.getenv('AZURE_ACCOUNT_KEY')};EndpointSuffix=core.windows.net"
+#     AZURE_CUSTOM_DOMAIN = f"{os.getenv('AZURE_ACCOUNT_NAME')}.blob.core.windows.net"
+#     AZURE_CONTAINER = os.getenv('AZURE_CONTAINER')
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
