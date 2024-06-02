@@ -1,10 +1,12 @@
-version: '3.8'
+version: "3.8"
 services:
   app:
+    working_dir: /usr/src/app
     build:
       context: .
     entrypoint: []
-    command: sh -c './devops/scripts/run_app.sh'
+    # command: python3 manage.py makemigrations && python3 manage.py migrate && python manage.py runserver 0.0.0.0:8000
+    command: sh -c 'chmod +x ./devops/scripts/run_app.sh && ./devops/scripts/run_app.sh'
     ports:
       - "8000:8000"
     volumes:
