@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
+from corsheaders.defaults import default_headers
 import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +23,12 @@ load_dotenv()
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-a#ep^^)(gk9@fbm(702gnn%&981j8a$@khpoh0&piwlx70d(ki'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -60,7 +61,16 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    os.getenv('WEB_APP_URL'),
     # Add more origins as needed
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    os.getenv('WEB_APP_URL'),
+]
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-sp-api-key",
 ]
 
 ROOT_URLCONF = 'nlpssdapp.urls'
@@ -89,39 +99,16 @@ WSGI_APPLICATION = 'nlpssdapp.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(default=os.getenv('DO_DB_STRING'))
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.postgresql',
-    #     'NAME': os.getenv('DB_NAME'),
-    #     'USER': os.getenv('DB_USER'),
-    #     'PASSWORD': os.getenv('DB_PASSWORD'),
-    #     'HOST': os.getenv('DB_HOST'),
-    #     'PORT': os.getenv('DB_PORT'),
-    # }
 }
 
-# storage
-
-# Media files (pdfs uploaded by users)
-# MEDIA_URL = '/media/' dev
+# Storage
 AZURE_CUSTOM_DOMAIN = os.getenv('AZURE_ACCOUNT_NAME') + '.blob.core.windows.net'
 AZURE_CONTAINER = os.getenv('AZURE_CONTAINER')
 AZURE_CONNECTION_STRING = f"DefaultEndpointsProtocol=https;AccountName={os.getenv('AZURE_ACCOUNT_NAME')};AccountKey={os.getenv('AZURE_ACCOUNT_KEY')};EndpointSuffix=core.windows.net"
-# AZURE_CUSTOM_DOMAIN = f"{os.getenv('AZURE_ACCOUNT_NAME')}.blob.core.windows.net"
 
 MEDIA_URL = 'https://' + AZURE_CUSTOM_DOMAIN + '/' + os.getenv('AZURE_CONTAINER') + '/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
-
-# PREVIOUS DEV SETTINGS
-# if DEBUG:
-#     # Local development settings
-#     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-# else:
-#     # Production settings (Azure Blob Storage)
-#     DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
-#     AZURE_CONNECTION_STRING = f"DefaultEndpointsProtocol=https;AccountName={os.getenv('AZURE_ACCOUNT_NAME')};AccountKey={os.getenv('AZURE_ACCOUNT_KEY')};EndpointSuffix=core.windows.net"
-#     AZURE_CUSTOM_DOMAIN = f"{os.getenv('AZURE_ACCOUNT_NAME')}.blob.core.windows.net"
-#     AZURE_CONTAINER = os.getenv('AZURE_CONTAINER')
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -167,7 +154,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(minutes=31),
     "ALGORITHM": "HS512",
-    # "SIGNING_KEY": os.environ['JWT_SIGNING_KEY'],
+    "SIGNING_KEY": os.getenv('JWT_SIGNING_KEY'),
     "USER_ID_CLAIM": "user_id",
 }
 # Default primary key field type
