@@ -48,7 +48,7 @@ def train_lsa_models(processing_instance):
     processed_text_file = download_file_from_url(processed_texts_url)
     
     start = 1
-    limit = 5
+    limit = 20
     step = 1
     # Load processed texts
     with tempfile.NamedTemporaryFile(delete=False) as temp_texts_file:

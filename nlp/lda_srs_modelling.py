@@ -66,7 +66,7 @@ def train_lda_models(processing_instance):
         processed_text = pickle.load(processed_text_file)
     
     start=1
-    limit=5
+    limit=20
     step=1
 
     # Create LDA models with varying number of topics
