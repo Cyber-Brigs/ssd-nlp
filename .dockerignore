@@ -1,0 +1,22 @@
+# Ignore general files and directories
+.git
+.idea
+*.pyc
+*.pyo
+*.pyd
+__pycache__
+*.sqlite3
+
+# Ignore Docker specific files
+.dockerignore
+Dockerfile
+
+# Ignore development and local files
+*.log
+*.bak
+*.swp
+venv/
+
+# Ignore miscellaneous
+node_modules/
+npm-debug.log
